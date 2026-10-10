@@ -5,6 +5,8 @@ import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.trace.SdkTracerProvider
+import link_shortener.analytics.futures.{GeoStatsClient, ReferrerClient}
+import link_shortener.analytics.{AnalyticsService, ReportApi}
 import link_shortener.links.{LinkApi, LinkRepository, LinkService, TitleRefresher}
 import link_shortener.preview.{FakePreviewServer, PreviewClient}
 import ma.chinespirit.parlance.{H2, Transactor}
@@ -15,6 +17,8 @@ import sttp.client4.*
 import sttp.client4.logging.slf4j.Slf4jLoggingBackend
 import sttp.client4.opentelemetry.OpenTelemetryTracingBackend
 import sttp.client4.prometheus.PrometheusBackend
+
+import scala.concurrent.ExecutionContext
 
 object Main extends OxApp.Simple, StrictLogging:
 
@@ -52,8 +56,10 @@ object Main extends OxApp.Simple, StrictLogging:
 
     val linkService = LinkService(linkRepository, previewClient)
     TitleRefresher.start(linkRepository, previewClient)
+    given ExecutionContext = ExecutionContext.global
+    val analyticsService = AnalyticsService(linkRepository, GeoStatsClient(), ReferrerClient())
 
-    val apiEndpoints = HelloApi.endpoints ++ LinkApi(linkService).endpoints
+    val apiEndpoints = HelloApi.endpoints ++ LinkApi(linkService).endpoints ++ ReportApi(analyticsService).endpoints
 
     releaseAfterScope:
       logger.info("HTTP server stopped")
