@@ -19,16 +19,38 @@ case class SafetyResponse(safe: Boolean) derives ConfiguredJsonValueCodec, Schem
 
 /** Talks to the external "link preview" service. */
 class PreviewClient(httpClientBackend: SyncBackend, baseUri: Uri):
+  private val retryPolicy = Schedule.exponentialBackoff(50.millis).maxRetries(3)
 
-  // TODO: fetch the title and check the safety of a URL, both at the same time
-  //   (until then, every URL counts as safe and has no title)
-  def preview(url: String): Either[Unavailable, Preview] = Right(Preview(title = None, safe = true))
+  /** Fetches the title and checks the safety of a URL, both at the same time. */
+  def preview(url: String): Either[Unavailable, Preview] =
+    val (title, safe) = par(fetchTitle(url), checkSafety(url))
+    safe.map(Preview(title, _))
 
-  // TODO: GET {baseUri}/title?url=..., which responds with a TitleResponse
-  //   The title is nice to have: retry failures (exponential backoff from 50 ms, max 3 retries),
-  //   give up after 1 second in total, and return None instead of failing.
-  def fetchTitle(url: String): Option[String] = ???
+  /** The title is nice to have: if we can't get it within 1 second, we carry on without it. */
+  def fetchTitle(url: String): Option[String] =
+    either
+      .catchAll:
+        timeout(1.second):
+          retry(retryPolicy):
+            basicRequest
+              .get(uri"$baseUri/title?url=$url")
+              .response(asJsonOrFail[TitleResponse])
+              .send(httpClientBackend)
+              .body
+              .title
+      .toOption
 
-  // TODO: GET {baseUri}/safety?url=..., which responds with a SafetyResponse
-  //   The safety check is required: same retries, give up after 2 seconds, and return Left(Unavailable(...)) on failure.
-  def checkSafety(url: String): Either[Unavailable, Boolean] = ???
+  /** The safety check is required: if it fails (after retries), we can't accept the link. */
+  def checkSafety(url: String): Either[Unavailable, Boolean] =
+    either
+      .catchAll:
+        timeout(2.seconds):
+          retry(retryPolicy):
+            basicRequest
+              .get(uri"$baseUri/safety?url=$url")
+              .response(asJsonOrFail[SafetyResponse])
+              .send(httpClientBackend)
+              .body
+              .safe
+      .left
+      .map(e => Unavailable(s"Could not check whether the URL is safe, try again later (${e.getClass.getSimpleName})"))
