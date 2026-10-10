@@ -34,6 +34,18 @@ class LinkApi(service: LinkService):
       .errorOut(oneOf[BadRequest | Conflict | Unavailable](badRequest, conflict, unavailable))
       .handle(request => service.createLink(request))
 
+  private val importLinks: ServerEndpoint[Any, Identity] =
+    endpoint.post
+      .tag("Links")
+      .summary("Shorten many URLs")
+      .description(
+        "Creates a short link for each URL, at most 10 per second and 4 at a time. Returns one result per URL, in the same order"
+      )
+      .in("api" / "links" / "import")
+      .in(jsonBody[ImportLinks])
+      .out(jsonBody[List[ImportResult]])
+      .handleSuccess(request => service.importLinks(request.urls))
+
   private val getLink: ServerEndpoint[Any, Identity] =
     endpoint.get
       .tag("Links")
@@ -55,4 +67,4 @@ class LinkApi(service: LinkService):
       .errorOut(oneOf[NotFound](notFound))
       .handle(code => service.visitLink(code))
 
-  val endpoints: List[ServerEndpoint[Any, Identity]] = List(createLink, getLink, redirect)
+  val endpoints: List[ServerEndpoint[Any, Identity]] = List(createLink, importLinks, getLink, redirect)

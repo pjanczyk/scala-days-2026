@@ -5,7 +5,7 @@ import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.trace.SdkTracerProvider
-import link_shortener.links.{InMemoryLinkRepository, LinkApi, LinkService}
+import link_shortener.links.{InMemoryLinkRepository, LinkApi, LinkService, TitleRefresher}
 import link_shortener.preview.{FakePreviewServer, PreviewClient}
 import ox.*
 import ox.otel.context.PropagatingVirtualThreadFactory
@@ -46,6 +46,7 @@ object Main extends OxApp.Simple, StrictLogging:
     val previewClient = PreviewClient(httpClientBackend, previewBaseUri)
 
     val linkService = LinkService(linkRepository, previewClient)
+    TitleRefresher.start(linkRepository, previewClient)
 
     val apiEndpoints = HelloApi.endpoints ++ LinkApi(linkService).endpoints
 

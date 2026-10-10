@@ -5,6 +5,8 @@ import link_shortener.preview.{FakePreviewServer, PreviewClient}
 import sttp.client4.*
 import sttp.tapir.server.stub4.TapirSyncStubInterpreter
 
+import scala.concurrent.duration.*
+
 /** Everything a test needs to talk to the app. The `backend` calls the server logic directly, without a network. */
 case class TestApp(backend: SyncBackend, repo: LinkRepository, upstream: FakePreviewServer)
 
@@ -25,3 +27,7 @@ object Fixtures:
     val endpoints = HelloApi.endpoints ++ LinkApi(service).endpoints
     val backend = TapirSyncStubInterpreter().whenServerEndpointsRunLogic(endpoints).backend()
     f(TestApp(backend, repo, upstream))
+
+  /** Retries an assertion until it passes, for things that happen in the background. */
+  def eventually[T](assertion: => T): T =
+    ox.resilience.retry(ox.scheduling.Schedule.fixedInterval(50.millis).maxAttempts(40))(assertion)

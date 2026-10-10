@@ -23,7 +23,7 @@ import sttp.tapir.server.netty.NettyConfig
  * A stand-in for an external "link preview" service, so that the lab doesn't depend on the internet.
  *
  * Like a real dependency, it is sometimes slow and sometimes fails. The behaviour is driven by the URL being checked:
- *   - `slow` in the URL: `/title` takes 5 seconds
+ *   - `slow` in the URL: the first `/title` call takes 5 seconds, later ones are fast
  *   - `lag` in the URL: both `/title` and `/safety` take 500 ms
  *   - `flaky` in the URL: the first 2 calls to each endpoint fail with 503
  *   - `down` in the URL: `/safety` always fails with 503
@@ -41,6 +41,7 @@ class FakePreviewServer(randomFailureRate: Double) extends StrictLogging:
     val attempt = calls.computeIfAbsent((endpointName, url), _ => AtomicInteger()).incrementAndGet()
     logger.info(s"Preview service: /$endpointName for $url (attempt $attempt)")
     if url.contains("lag") then sleep(500.millis)
+    if url.contains("slow") && endpointName == "title" && attempt == 1 then sleep(5.seconds)
     if url.contains("flaky") && attempt <= 2 then Left(StatusCode.ServiceUnavailable)
     else if !url.contains("flaky") && Random.nextDouble() < randomFailureRate then Left(StatusCode.ServiceUnavailable)
     else Right(response)
@@ -53,7 +54,6 @@ class FakePreviewServer(randomFailureRate: Double) extends StrictLogging:
       .errorOut(statusCode)
       .handle: url =>
         respond("title", url):
-          if url.contains("slow") then sleep(5.seconds)
           TitleResponse(s"Welcome to ${Option(URI(url).getHost).getOrElse(url)}")
 
   private val safetyEndpoint =

@@ -5,9 +5,11 @@ import link_shortener.preview.PreviewClient
 import link_shortener.{BadRequest, Conflict, Metrics, NotFound, Unavailable}
 import ox.either
 import ox.either.{fail, ok}
+import ox.flow.Flow
 
 import java.net.URI
 import java.time.Clock
+import scala.concurrent.duration.*
 import scala.util.{Random, Try}
 
 class LinkService(
@@ -29,6 +31,16 @@ class LinkService(
       logger.info(s"Created link /${link.code} -> $url")
       Metrics.linksCreated.inc()
       link
+
+  // TODO: import at most 10 URLs per second (throttle) and at most 4 at a time (mapPar), with a Flow;
+  //   keep the results in the order of `urls`
+  def importLinks(urls: List[String]): List[ImportResult] =
+    urls.map(importLink)
+
+  private def importLink(url: String): ImportResult =
+    createLink(CreateLink(url)) match
+      case Right(link) => ImportResult(url, Some(link), None)
+      case Left(error) => ImportResult(url, None, Some(error.message))
 
   def getLink(code: ShortCode): Either[NotFound, Link] =
     linkRepository.find(code).toRight(NotFound(s"Link '$code' not found"))
