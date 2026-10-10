@@ -13,7 +13,6 @@ object HelloApi:
       .in("api" / "hello")
       .in(query[String]("name"))
       .out(stringBody)
-      // TODO: greet the caller by name, e.g. "Hello, Berlin!"
-      .handleSuccess(name => ???)
+      .handleSuccess(name => s"Hello, $name!")
 
   val endpoints: List[ServerEndpoint[Any, Identity]] = List(hello)
