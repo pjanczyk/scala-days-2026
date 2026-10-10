@@ -5,8 +5,10 @@ import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.trace.SdkTracerProvider
-import link_shortener.links.{InMemoryLinkRepository, LinkApi, LinkService, TitleRefresher}
+import link_shortener.links.{LinkApi, LinkRepository, LinkService, TitleRefresher}
 import link_shortener.preview.{FakePreviewServer, PreviewClient}
+import ma.chinespirit.parlance.{H2, Transactor}
+import org.h2.jdbcx.JdbcDataSource
 import ox.*
 import ox.otel.context.PropagatingVirtualThreadFactory
 import sttp.client4.*
@@ -33,7 +35,10 @@ object Main extends OxApp.Simple, StrictLogging:
         .build()
     )
 
-    val linkRepository = InMemoryLinkRepository()
+    val dataSource = JdbcDataSource().tap(_.setURL("jdbc:h2:mem:link_shortener;MODE=PostgreSQL;DB_CLOSE_DELAY=-1"))
+    DatabaseMigrations.run(dataSource)
+    val xa = Transactor(H2, dataSource)
+    val linkRepository = LinkRepository(xa)
 
     val httpClientBackend = useCloseableInScope(
       DefaultSyncBackend()
