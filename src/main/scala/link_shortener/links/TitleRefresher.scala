@@ -13,6 +13,14 @@ object TitleRefresher:
       previewClient: PreviewClient,
       interval: FiniteDuration = 5.seconds
   )(using Ox): Unit =
-    // TODO: start a fork that, every `interval`, takes the links without a title (repo.findWithoutTitle),
-    //   fetches their titles with previewClient.fetchTitle, at most 4 at a time, and stores them with repo.updateTitle
-    ()
+    fork:
+      Flow
+        .tick(interval)
+        .mapConcat(_ => repo.findWithoutTitle())
+        .mapPar(4)(link =>
+          previewClient
+            .fetchTitle(link.url) match
+            case Some(title) => repo.updateTitle(link.code, title)
+            case None        => ()
+        )
+        .runDrain()

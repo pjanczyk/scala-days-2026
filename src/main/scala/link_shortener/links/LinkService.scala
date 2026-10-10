@@ -32,10 +32,13 @@ class LinkService(
       Metrics.linksCreated.inc()
       link
 
-  // TODO: import at most 10 URLs per second (throttle) and at most 4 at a time (mapPar), with a Flow;
-  //   keep the results in the order of `urls`
+  /** Imports at most 10 URLs per second, and at most 4 at a time. The results are in the order of `urls`. */
   def importLinks(urls: List[String]): List[ImportResult] =
-    urls.map(importLink)
+    Flow
+      .fromIterable(urls)
+      .throttle(10, 1.second)
+      .mapPar(4)(importLink)
+      .runToList()
 
   private def importLink(url: String): ImportResult =
     createLink(CreateLink(url)) match
