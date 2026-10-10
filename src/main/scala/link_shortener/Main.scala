@@ -5,6 +5,7 @@ import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.trace.SdkTracerProvider
+import link_shortener.links.{InMemoryLinkRepository, LinkApi, LinkService}
 import ox.*
 import ox.otel.context.PropagatingVirtualThreadFactory
 
@@ -27,7 +28,10 @@ object Main extends OxApp.Simple, StrictLogging:
         .build()
     )
 
-    val apiEndpoints = HelloApi.endpoints
+    val linkRepository = InMemoryLinkRepository()
+    val linkService = LinkService(linkRepository)
+
+    val apiEndpoints = HelloApi.endpoints ++ LinkApi(linkService).endpoints
 
     releaseAfterScope:
       logger.info("HTTP server stopped")
