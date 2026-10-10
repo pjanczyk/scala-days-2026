@@ -12,6 +12,12 @@ class LinkApi(service: LinkService):
   private val badRequest: EndpointOutput.OneOfVariant[BadRequest] = oneOfVariant(
     statusCode(StatusCode.BadRequest).and(jsonBody[BadRequest])
   )
+  private val conflict: EndpointOutput.OneOfVariant[Conflict] = oneOfVariant(
+    statusCode(StatusCode.Conflict).and(jsonBody[Conflict])
+  )
+  private val notFound: EndpointOutput.OneOfVariant[NotFound] = oneOfVariant(
+    statusCode(StatusCode.NotFound).and(jsonBody[NotFound])
+  )
 
   private val createLink: ServerEndpoint[Any, Identity] =
     endpoint.post
@@ -22,16 +28,28 @@ class LinkApi(service: LinkService):
       .in(jsonBody[CreateLink])
       .out(statusCode(StatusCode.Created))
       .out(jsonBody[Link])
-      // TODO: also map Conflict to 409
-      .errorOut(oneOf[BadRequest | Conflict](badRequest))
+      .errorOut(oneOf[BadRequest | Conflict](badRequest, conflict))
       .handle(request => service.createLink(request))
 
-  // TODO: GET /api/links/{code}, returning the Link as JSON
   private val getLink: ServerEndpoint[Any, Identity] =
-    endpoint.handle(_ => ???)
+    endpoint.get
+      .tag("Links")
+      .summary("Get a link")
+      .description("Returns a link with its title and visit count")
+      .in("api" / "links" / path[ShortCode]("code"))
+      .out(jsonBody[Link])
+      .errorOut(oneOf[NotFound](notFound))
+      .handle(code => service.getLink(code))
 
-  // TODO: GET /{code}, returning status 302 Found and the URL in the Location header
   private val redirect: ServerEndpoint[Any, Identity] =
-    endpoint.handle(_ => ???)
+    endpoint.get
+      .tag("Links")
+      .summary("Follow a short link")
+      .description("Redirects to the original URL and counts the visit")
+      .in(path[ShortCode]("code"))
+      .out(statusCode(StatusCode.Found))
+      .out(header[String](HeaderNames.Location))
+      .errorOut(oneOf[NotFound](notFound))
+      .handle(code => service.visitLink(code))
 
   val endpoints: List[ServerEndpoint[Any, Identity]] = List(createLink, getLink, redirect)
