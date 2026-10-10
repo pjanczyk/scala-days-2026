@@ -18,8 +18,6 @@ import sttp.client4.logging.slf4j.Slf4jLoggingBackend
 import sttp.client4.opentelemetry.OpenTelemetryTracingBackend
 import sttp.client4.prometheus.PrometheusBackend
 
-import scala.concurrent.ExecutionContext
-
 object Main extends OxApp.Simple, StrictLogging:
 
   override protected def settings: OxApp.Settings = OxApp.Settings.Default.copy(
@@ -56,7 +54,6 @@ object Main extends OxApp.Simple, StrictLogging:
 
     val linkService = LinkService(linkRepository, previewClient)
     TitleRefresher.start(linkRepository, previewClient)
-    given ExecutionContext = ExecutionContext.global
     val analyticsService = AnalyticsService(linkRepository, GeoStatsClient(), ReferrerClient())
 
     val apiEndpoints = HelloApi.endpoints ++ LinkApi(linkService).endpoints ++ ReportApi(analyticsService).endpoints

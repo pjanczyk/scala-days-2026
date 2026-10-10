@@ -7,9 +7,10 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** Legacy Future-based code that depends on [[AnalyticsService]]. Its own callers expect a `Future`: keep its API. */
 class WeeklyDigest(analyticsService: AnalyticsService)(using ExecutionContext):
-  // TODO: once AnalyticsService.report is in direct style, keep returning a Future here:
-  //   wrap each report call in a Future that runs on virtual threads, not on the ExecutionContext of the caller
+  /** Runs the blocking, direct-style calls on virtual threads, so that they don't block the caller's thread pool. */
+  private val virtualThreads = ExecutionContext.fromExecutorService(Executors.newVirtualThreadPerTaskExecutor())
+
   def build(codes: List[String]): Future[List[LinkReport]] =
     Future
-      .traverse(codes)(code => analyticsService.report(code))
+      .traverse(codes)(code => Future(analyticsService.report(code))(using virtualThreads))
       .map(_.flatMap(_.toOption).sortBy(-_.visits))

@@ -2,7 +2,6 @@ package link_shortener.analytics
 
 import link_shortener.NotFound
 import link_shortener.links.ShortCode
-import ox.get
 import sttp.model.StatusCode
 import sttp.shared.Identity
 import sttp.tapir.*
@@ -22,6 +21,6 @@ class ReportApi(service: AnalyticsService):
       .in("api" / "links" / path[ShortCode]("code") / "report")
       .out(jsonBody[LinkReport])
       .errorOut(oneOf[NotFound](notFound))
-      .handle(code => service.report(code).get())
+      .handle(code => service.report(code))
 
   val endpoints: List[ServerEndpoint[Any, Identity]] = List(report)
