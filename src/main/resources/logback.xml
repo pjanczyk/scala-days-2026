@@ -1,0 +1,20 @@
+<configuration>
+  <!-- Silences logback's own start-up messages -->
+  <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %-5level [trace %.-8X{trace_id:-none}] %logger{40} - %msg%n</pattern>
+    </encoder>
+  </appender>
+  <!-- Adds the trace_id and span_id of the current OpenTelemetry span to every log event -->
+  <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.mdc.v1_0.OpenTelemetryAppender">
+    <appender-ref ref="STDOUT"/>
+  </appender>
+  <logger name="link_shortener" level="INFO"/>
+  <logger name="org.flywaydb" level="WARN"/>
+  <logger name="sttp.tapir.server.netty.sync.NettySyncServerOptions$" level="DEBUG"/>
+  <logger name="sttp.client4.logging.slf4j.Slf4jLoggingBackend" level="DEBUG"/>
+  <root level="WARN">
+    <appender-ref ref="OTEL"/>
+  </root>
+</configuration>

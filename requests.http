@@ -1,0 +1,58 @@
+# Requests from the worksheets, for the IntelliJ HTTP client. Start the service first: scala-cli run .
+
+@host = http://localhost:8080
+
+### Step 0: hello
+GET {{host}}/api/hello?name=Berlin
+
+### Step 1: create a link with an alias (201, then 409 when the alias is taken)
+POST {{host}}/api/links
+Content-Type: application/json
+
+{"url": "https://scala-lang.org", "alias": "scala"}
+
+### Step 1: get a link (404 for an unknown code)
+GET {{host}}/api/links/scala
+
+### Step 1: follow a short link (302, the URL in the Location header)
+# @no-redirect
+GET {{host}}/scala
+
+### Step 2: a flaky preview service: succeeds after retries
+POST {{host}}/api/links
+Content-Type: application/json
+
+{"url": "https://flaky.example.com"}
+
+### Step 2: a slow title: about 1 s, no title
+POST {{host}}/api/links
+Content-Type: application/json
+
+{"url": "https://slow.example.com"}
+
+### Step 2: the safety check is down: 503
+POST {{host}}/api/links
+Content-Type: application/json
+
+{"url": "https://down.example.com"}
+
+### Step 3: import many URLs, at most 10 per second and 4 at a time: one result per URL, in order
+POST {{host}}/api/links/import
+Content-Type: application/json
+
+{"urls": ["https://scala-lang.org", "nope", "https://lag1.example.com", "https://lag2.example.com"]}
+
+### Step 3: a slow title: the link is created without one
+POST {{host}}/api/links
+Content-Type: application/json
+
+{"url": "https://slow2.example.com", "alias": "slow"}
+
+### Step 3: a few seconds later, the title refresher has filled it in
+GET {{host}}/api/links/slow
+
+### Step 5: the analytics report
+GET {{host}}/api/links/scala/report
+
+### Metrics in Prometheus format
+GET {{host}}/metrics
