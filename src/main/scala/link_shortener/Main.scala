@@ -6,8 +6,13 @@ import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.trace.SdkTracerProvider
 import link_shortener.links.{InMemoryLinkRepository, LinkApi, LinkService}
+import link_shortener.preview.{FakePreviewServer, PreviewClient}
 import ox.*
 import ox.otel.context.PropagatingVirtualThreadFactory
+import sttp.client4.*
+import sttp.client4.logging.slf4j.Slf4jLoggingBackend
+import sttp.client4.opentelemetry.OpenTelemetryTracingBackend
+import sttp.client4.prometheus.PrometheusBackend
 
 object Main extends OxApp.Simple, StrictLogging:
 
@@ -29,7 +34,18 @@ object Main extends OxApp.Simple, StrictLogging:
     )
 
     val linkRepository = InMemoryLinkRepository()
-    val linkService = LinkService(linkRepository)
+
+    val httpClientBackend = useCloseableInScope(
+      DefaultSyncBackend()
+        .pipe(Slf4jLoggingBackend(_)) // logging
+        .pipe(OpenTelemetryTracingBackend(_, openTelemetry)) // `traceparent` header in outgoing calls
+        .pipe(PrometheusBackend(_)) // metrics
+    )
+    // A fake external "link preview" server on a random free port
+    val previewBaseUri = FakePreviewServer.start(openTelemetry, randomFailureRate = 0.3)
+    val previewClient = PreviewClient(httpClientBackend, previewBaseUri)
+
+    val linkService = LinkService(linkRepository, previewClient)
 
     val apiEndpoints = HelloApi.endpoints ++ LinkApi(linkService).endpoints
 

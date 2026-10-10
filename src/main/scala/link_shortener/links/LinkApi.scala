@@ -1,6 +1,6 @@
 package link_shortener.links
 
-import link_shortener.{BadRequest, Conflict, NotFound}
+import link_shortener.{BadRequest, Conflict, NotFound, Unavailable}
 import sttp.model.{HeaderNames, StatusCode}
 import sttp.shared.Identity
 import sttp.tapir.*
@@ -18,6 +18,9 @@ class LinkApi(service: LinkService):
   private val notFound: EndpointOutput.OneOfVariant[NotFound] = oneOfVariant(
     statusCode(StatusCode.NotFound).and(jsonBody[NotFound])
   )
+  private val unavailable: EndpointOutput.OneOfVariant[Unavailable] = oneOfVariant(
+    statusCode(StatusCode.ServiceUnavailable).and(jsonBody[Unavailable])
+  )
 
   private val createLink: ServerEndpoint[Any, Identity] =
     endpoint.post
@@ -28,7 +31,7 @@ class LinkApi(service: LinkService):
       .in(jsonBody[CreateLink])
       .out(statusCode(StatusCode.Created))
       .out(jsonBody[Link])
-      .errorOut(oneOf[BadRequest | Conflict](badRequest, conflict))
+      .errorOut(oneOf[BadRequest | Conflict | Unavailable](badRequest, conflict, unavailable))
       .handle(request => service.createLink(request))
 
   private val getLink: ServerEndpoint[Any, Identity] =

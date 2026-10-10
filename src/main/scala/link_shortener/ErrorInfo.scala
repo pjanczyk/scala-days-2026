@@ -10,3 +10,4 @@ sealed trait ErrorInfo:
 case class NotFound(message: String) extends ErrorInfo derives ConfiguredJsonValueCodec, Schema
 case class BadRequest(message: String) extends ErrorInfo derives ConfiguredJsonValueCodec, Schema
 case class Conflict(message: String) extends ErrorInfo derives ConfiguredJsonValueCodec, Schema
+case class Unavailable(message: String) extends ErrorInfo derives ConfiguredJsonValueCodec, Schema

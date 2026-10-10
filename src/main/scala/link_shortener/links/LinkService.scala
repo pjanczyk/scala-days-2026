@@ -1,9 +1,10 @@
 package link_shortener.links
 
 import com.typesafe.scalalogging.StrictLogging
-import link_shortener.{BadRequest, Conflict, Metrics, NotFound}
+import link_shortener.preview.PreviewClient
+import link_shortener.{BadRequest, Conflict, Metrics, NotFound, Unavailable}
 import ox.either
-import ox.either.ok
+import ox.either.{fail, ok}
 
 import java.net.URI
 import java.time.Clock
@@ -11,16 +12,19 @@ import scala.util.{Random, Try}
 
 class LinkService(
     linkRepository: LinkRepository,
+    previewClient: PreviewClient,
     clock: Clock = Clock.systemUTC()
 ) extends StrictLogging:
 
-  def createLink(request: CreateLink): Either[BadRequest | Conflict, Link] =
+  def createLink(request: CreateLink): Either[BadRequest | Conflict | Unavailable, Link] =
     either:
       val url = validateUrl(request.url).ok()
       val code = request.alias match
         case Some(alias) => validateAlias(alias).ok()
         case None        => randomCode()
-      val link = Link(code, url, title = None, visits = 0, createdAt = clock.instant())
+      val preview = previewClient.preview(url).ok()
+      if !preview.safe then BadRequest(s"URL is flagged as unsafe: $url").fail()
+      val link = Link(code, url, preview.title, visits = 0, createdAt = clock.instant())
       linkRepository.insert(link).ok()
       logger.info(s"Created link /${link.code} -> $url")
       Metrics.linksCreated.inc()
